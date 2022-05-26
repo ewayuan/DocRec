@@ -2,6 +2,7 @@ import argparse
 import json
 from collections import Counter
 import random
+import os 
 
 import numpy as np
 import pandas as pd
@@ -20,19 +21,24 @@ from utils.config import init_opts, train_opts, multihead_att_opts
 from utils.util import save_pickle, load_pickle
 from transformers import AdamW, BertModel, BertTokenizer, get_linear_schedule_with_warmup
 
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=2021, type=int)
 parser.add_argument('--gpu', default=0, type=int)
+parser.add_argument('--n_gpu', default=2, type=int)
+
 parser.add_argument('--name', default="med-bert", type=str)
 parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
-parser.add_argument('--dr_dialog_sample', default=2, type=int)
+parser.add_argument('--dr_dialog_sample', default=5, type=int)
 parser.add_argument('--neg_sample', default=2, type=int)
 parser.add_argument('--batch_size', default=2, type=int)
 parser.add_argument('--lr', default=2e-5, type=int)
 parser.add_argument('--patience', default=7, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=10, type=int)
+
 
 args = parser.parse_args()
 
@@ -108,7 +114,7 @@ def main():
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     del train_set, train_dataset
     print('Done')
-    
+
     print('Building validation dataset and dataloader...')
     valid_set = pd.read_csv(f'./dataset/valid_mini.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
     val_dataset = DoctorRecDataset(
@@ -118,9 +124,15 @@ def main():
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     del valid_set, val_dataset, profile_ids, query_ids, dialogue_ids,
     print('Done')
+
+    model = ourModel().cuda()
+    if args.n_gpu > 1:
+        model = torch.nn.DataParallel(model, device_ids=range(args.n_gpu))
+        model = model.module
     
-    model = ourModel()
-    model.cuda()
+    # with LineProfiler(train_model) as prof:
+    #     train_model(model, train_dataloader, val_dataloader)
+    # prof.display()
 
     train_model(model, train_dataloader, val_dataloader)
 

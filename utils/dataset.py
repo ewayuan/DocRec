@@ -30,7 +30,6 @@ class DoctorRecDataset(Dataset):
         self.features = []
         self.labels = []
         for dr in tqdm(self.dr_list, desc='packing doctor features'):
-            print("dr: ", dr)
             self.pack_dr_features(dr)
         self.pack_dataset()
         self.profile = []
@@ -73,10 +72,15 @@ class DoctorRecDataset(Dataset):
 
         # diagolues mask:
 
-        return (torch.tensor(profile_input_ids), torch.tensor(profile_token_type_ids), torch.tensor(profile_attention_mask), \
-               torch.tensor(query_input_ids), torch.tensor(query_token_type_ids), torch.tensor(query_attention_mask), \
+        # return (torch.tensor(profile_input_ids), torch.tensor(profile_token_type_ids), torch.tensor(profile_attention_mask), \
+        #        torch.tensor(query_input_ids), torch.tensor(query_token_type_ids), torch.tensor(query_attention_mask), \
+        #        torch.stack(diagolues_input_ids), torch.stack(diagolues_token_type_ids), torch.stack(diagolues_attention_mask),\
+        #        torch.FloatTensor(diagolues_mask_all)), torch.FloatTensor([self.labels[index]])[0]
+        return (profile_input_ids.clone().detach(), profile_token_type_ids.clone().detach(), profile_attention_mask.clone().detach(), \
+               query_input_ids.clone().detach(), query_token_type_ids.clone().detach(), query_attention_mask.clone().detach(), \
                torch.stack(diagolues_input_ids), torch.stack(diagolues_token_type_ids), torch.stack(diagolues_attention_mask),\
                torch.FloatTensor(diagolues_mask_all)), torch.FloatTensor([self.labels[index]])[0]
+
 
     def __len__(self):
         return len(self.labels)

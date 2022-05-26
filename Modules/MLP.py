@@ -64,7 +64,7 @@ class cnnBlock(nn.Module):
         self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
         self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
         self.maxpooling_query_dialogs_1 = nn.MaxPool2d(kernel_size=(1, 1), stride=(1, 1))
-        self.affine_query_dialogs = nn.Linear(in_features=512, out_features=200)
+        self.affine_query_dialogs = nn.Linear(in_features=1280, out_features=200)
         self.affine_out = nn.Linear(in_features=400, out_features=1)
 
         self.init_weights()
@@ -133,7 +133,6 @@ class ourModel (nn.Module):
         self.bert_model =  BertModel.from_pretrained('./mc_bert_base/', output_hidden_states=False)
 
     def process_dialogues(self, batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model):
-
         batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
         cur_batch_dr_dialogs_emb = []
         for batch_idx in range(batch_size):
@@ -142,11 +141,12 @@ class ourModel (nn.Module):
             #print("batch_diagolues_attention_mask[:,dialog_idx,:]: ", batch_diagolues_attention_mask[batch_idx,:,:].shape)
             #print("batch_diagolues_token_type_ids[:,dialog_idx,:]: ", batch_diagolues_token_type_ids[batch_idx,:,:].shape)
 
-            batch_dialogs = {"input_ids": batch_dialogs_input_ids[batch_idx,:,:], \
-                          "attention_mask": batch_dialogs_attention_mask[batch_idx,:,:], \
-                          "token_type_ids": batch_dialogs_token_type_ids[batch_idx,:,:]}
+            batch_dialogs = {"input_ids": batch_dialogs_input_ids[batch_idx,:,:].cuda(), \
+                          "attention_mask": batch_dialogs_attention_mask[batch_idx,:,:].cuda(), \
+                          "token_type_ids": batch_dialogs_token_type_ids[batch_idx,:,:].cuda()}
             # take avery of last hidden layer: 1 * emb_size
             output_cur_dialogs_emb = model.bert_model(**batch_dialogs)[0]
+
             #print("output_cur_dialog_emb:", output_cur_dialog_emb.shape)
             cur_batch_dr_dialogs_emb.append(torch.mean(output_cur_dialogs_emb, dim=1))
         cur_batch_dialogs_emb = torch.stack(cur_batch_dr_dialogs_emb, dim = 0)    
@@ -179,15 +179,14 @@ def train_epoch(train_dataloader, optimizer, model, tag):
     epoch_loss = []
 
     for batch, labels in tqdm(train_dataloader):
-        batch = tuple(t.cuda() for t in batch)
         labels = labels.cuda()
-        batch_profile_input_ids, batch_profile_token_type_ids, batch_profile_attention_mask = batch[0].squeeze(), batch[1].squeeze(), batch[2].squeeze().float()
-        batch_query_input_ids, batch_query_token_type_ids, batch_query_attention_mask =  batch[3].squeeze(), batch[4].squeeze(), batch[5].squeeze().float()
+        batch_profile_input_ids, batch_profile_token_type_ids, batch_profile_attention_mask = batch[0].squeeze().cuda(), batch[1].squeeze().cuda(), batch[2].squeeze().float().cuda()
+        batch_query_input_ids, batch_query_token_type_ids, batch_query_attention_mask =  batch[3].squeeze().cuda(), batch[4].squeeze().cuda(), batch[5].squeeze().float().cuda()
         batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask = batch[6], batch[7], batch[8].float()
         # print("batch_profile_input_ids: ", batch_profile_input_ids.shape)
         # print("batch_profile_token_type_ids: ", batch_profile_token_type_ids.shape)
         # print("batch_profile_attention_mask: ", batch_profile_attention_mask.shape)
-
+        
         # print("batch_query_input_ids: ", batch_query_input_ids.shape)
         # print("batch_query_token_type_ids: ", batch_query_token_type_ids.shape)
         # print("batch_query_attention_mask: ", batch_query_attention_mask.shape)
@@ -202,18 +201,18 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         # batch_profile = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2]}
         batch_profile = {"input_ids": batch_profile_input_ids, "attention_mask": batch_profile_attention_mask, "token_type_ids": batch_profile_token_type_ids}
         batch_query = {"input_ids": batch_query_input_ids, "attention_mask": batch_query_attention_mask, "token_type_ids": batch_query_token_type_ids}
-
+        
 
         output_profile_emb = model.bert_model(**batch_profile)[0] # batch_size, max_len, emb_size, take last_hidden_status
         output_query_emb = model.bert_model(**batch_query)[0] # batch_size, max_len, emb_size, take last_hidden_status
-
+        
         # print("output_profile_emb: ", output_profile_emb.shape)
         # print("output_query_emb: ", output_query_emb.shape)
 
         batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
         batch_dialogs_emb = model.process_dialogues(batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model)
 
-        batch_dialogs_attention_mask_fake = batch[9].float()
+        batch_dialogs_attention_mask_fake = batch[9].float().cuda()
 
         if tag == "train":
             optimizer.zero_grad()
