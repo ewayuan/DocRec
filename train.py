@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
 from Modules.MLP import ourModel
+from Modules.MLP import train_epoch
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -25,16 +26,15 @@ parser.add_argument('--gpu', default=0, type=int)
 parser.add_argument('--name', default="med-bert", type=str)
 parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
-parser.add_argument('--dr_dialog_sample', default=3, type=int)
+parser.add_argument('--dr_dialog_sample', default=2, type=int)
 parser.add_argument('--neg_sample', default=2, type=int)
-parser.add_argument('--batch_size', default=4, type=int)
+parser.add_argument('--batch_size', default=2, type=int)
 parser.add_argument('--lr', default=2e-5, type=int)
 parser.add_argument('--patience', default=7, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=10, type=int)
 
 args = parser.parse_args()
-
 
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed(args.seed)
@@ -66,19 +66,14 @@ def train_model(model, train_dataloader, val_dataloader):
     for epoch in trange(args.epoch_num):
         print(f'Current Epoch: {epoch+1}')
         model.train()
-        logits = model.train_epoch(train_dataloader, optimizer, model)
+        train_losses = train_epoch(train_dataloader, optimizer, model, "train")
         model.eval()
         with torch.no_grad():
-            for features, labels in tqdm(val_dataloader):
-                if torch.cuda.is_available():
-                    features = features.cuda()
-                    labels = labels.cuda()
-                pred_scores = model(features, args.dr_dialog_sample)
-                loss = weighted_class_bceloss(pred_scores, labels.reshape(-1, 1), weights)
-                valid_losses.append(loss.item())
-                
+            valid_losses = train_epoch(val_dataloader, optimizer, model, "valid")
+        
         train_loss = np.average(train_losses)
         valid_loss = np.average(valid_losses)
+                
         print(f'\nEpoch {epoch+1}, train loss: {train_loss}, valid loss: {valid_loss}')
         torch.save(model.state_dict(),f'./{args.output_dir}/ckpt/model_{epoch+1}.pt')
         if (epoch+1 > 15): 
