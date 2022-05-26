@@ -152,22 +152,6 @@ class ourModel (nn.Module):
         cur_batch_dialogs_emb = torch.stack(cur_batch_dr_dialogs_emb, dim = 0)    
         return cur_batch_dialogs_emb
     
-    def get_dialogues_masks(self,batch_dialogs_attention_mask):
-        batch_size, dr_dialog_num, max_len = batch_dialogs_attention_mask.shape
-
-        batch_dialogs_attention_mask_editted = []
-        for batch in range(batch_size):
-            cur_batch_dialogs_attention_mask = []
-            for cur_dialog in range(dr_dialog_num):
-                if torch.sum(batch_dialogs_attention_mask[batch][cur_dialog]) == 0:
-                    # if sum of attention_mask is 0, it means that dialog is empty, then mask it as 0
-                    cur_batch_dialogs_attention_mask.append(0)
-                else:
-                    # the current dialog is not empty, then mask it as 1
-                    cur_batch_dialogs_attention_mask.append(1)
-            batch_dialogs_attention_mask_editted.append(cur_batch_dialogs_attention_mask)
-        return torch.FloatTensor(batch_dialogs_attention_mask_editted)
-
     def forward(self, batch_query_emb, batch_profile_emb, batch_dialogs_emb, \
          batch_query_mask, batch_profile_mask, batch_dialogs_mask):
 
@@ -229,8 +213,10 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
         batch_dialogs_emb = model.process_dialogues(batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model)
 
-        batch_dialogs_attention_mask_fake = model.get_dialogues_masks(batch_dialogs_attention_mask).cuda()
-
+        batch_dialogs_attention_mask_fake = batch[9].float()
+        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake)
+        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake.shape)
+        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake.shapes)
 
         if tag == "train":
             optimizer.zero_grad()

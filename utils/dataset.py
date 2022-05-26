@@ -57,15 +57,26 @@ class DoctorRecDataset(Dataset):
         diagolues_input_ids = []
         diagolues_token_type_ids = []
         diagolues_attention_mask = []
+
+        diagolues_mask_all = []
         for d in diagolues:
             diagolues_input_ids.extend(d["input_ids"])
             diagolues_token_type_ids.extend(d["token_type_ids"])
             diagolues_attention_mask.extend(d["attention_mask"])
 
+            # if sum of d["attention_mask"]is 0, it means the current dialogue is empty
+            # else, it means the current dialogue is not empty
+            if torch.sum(d["attention_mask"]) == 0:
+                diagolues_mask_all.append(0)
+            else:
+                diagolues_mask_all.append(1)
+
+        # diagolues mask:
+
         return (torch.tensor(profile_input_ids), torch.tensor(profile_token_type_ids), torch.tensor(profile_attention_mask), \
                torch.tensor(query_input_ids), torch.tensor(query_token_type_ids), torch.tensor(query_attention_mask), \
-               torch.stack(diagolues_input_ids), torch.stack(diagolues_token_type_ids), torch.stack(diagolues_attention_mask)),\
-               torch.FloatTensor([self.labels[index]])[0]
+               torch.stack(diagolues_input_ids), torch.stack(diagolues_token_type_ids), torch.stack(diagolues_attention_mask),\
+               torch.FloatTensor(diagolues_mask_all)), torch.FloatTensor([self.labels[index]])[0]
 
     def __len__(self):
         return len(self.labels)

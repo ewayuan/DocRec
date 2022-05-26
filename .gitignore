@@ -15,3 +15,13 @@ mc_bert_base/bert_model.ckpt.meta
 mc_bert_base/config.json
 mc_bert_base/pytorch_model.bin
 mc_bert_base/vocab.txt
+dataset/dialogues.json
+dataset/dr_profile.jsonl
+dataset/embed.csv
+dataset/test.csv
+dataset/train.csv
+dataset/valid.csv
+dataset/embed_cleaned.csv
+dataset/test_cleaned.csv
+dataset/train_cleaned.csv
+dataset/valid_cleaned.csv
