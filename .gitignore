@@ -25,3 +25,7 @@ dataset/embed_cleaned.csv
 dataset/test_cleaned.csv
 dataset/train_cleaned.csv
 dataset/valid_cleaned.csv
+saved_model/ckpt/model_4.pt
+saved_model/ckpt/model_1.pt
+saved_model/ckpt/model_2.pt
+saved_model/ckpt/model_3.pt

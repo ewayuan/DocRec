@@ -183,7 +183,7 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         labels = labels.cuda()
         batch_profile_input_ids, batch_profile_token_type_ids, batch_profile_attention_mask = batch[0].squeeze(), batch[1].squeeze(), batch[2].squeeze().float()
         batch_query_input_ids, batch_query_token_type_ids, batch_query_attention_mask =  batch[3].squeeze(), batch[4].squeeze(), batch[5].squeeze().float()
-        batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask = batch[6], batch[7], batch[8]
+        batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask = batch[6], batch[7], batch[8].float()
         # print("batch_profile_input_ids: ", batch_profile_input_ids.shape)
         # print("batch_profile_token_type_ids: ", batch_profile_token_type_ids.shape)
         # print("batch_profile_attention_mask: ", batch_profile_attention_mask.shape)

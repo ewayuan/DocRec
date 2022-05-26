@@ -6,7 +6,7 @@ def remove_nan(csv):
     print("orginal df: ", df.shape)
     df = df[~pd.isna(df["parsed_dialog"])]
     print("after clean df: ", df.shape)
-    df.to_csv(csv.replace(".csv", "") + '_cleaned.csv', index=False)
+    df.to_csv(csv.replace(".csv", "") + '_cleaned.csv', sep ='\t', index=False)
     return df
 
 def main():
