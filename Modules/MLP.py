@@ -214,9 +214,6 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         batch_dialogs_emb = model.process_dialogues(batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model)
 
         batch_dialogs_attention_mask_fake = batch[9].float()
-        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake)
-        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake.shape)
-        print("batch_dialogs_attention_mask_fake: ", batch_dialogs_attention_mask_fake.shapes)
 
         if tag == "train":
             optimizer.zero_grad()
