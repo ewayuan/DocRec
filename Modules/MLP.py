@@ -11,6 +11,7 @@ from tqdm import tqdm
 from transformers import AdamW, BertModel, BertTokenizer, get_linear_schedule_with_warmup
 
 import logging
+import GPUtil
 
 class TransformerBlock(nn.Module):
     def __init__(self, input_size, is_layer_norm=False):
@@ -58,13 +59,13 @@ class cnnBlock(nn.Module):
         self.cnn_2d_query_profile_1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3,3))
         self.cnn_2d_query_profile_2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3,3))
         self.maxpooling_query_profile_1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
-        self.affine_query_profile = nn.Linear(in_features=3844, out_features=200)
+        self.affine_query_profile = nn.Linear(in_features=900, out_features=200)
         self.relu = nn.ReLU()
 
         self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
         self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
         self.maxpooling_query_dialogs_1 = nn.MaxPool2d(kernel_size=(1, 1), stride=(1, 1))
-        self.affine_query_dialogs = nn.Linear(in_features=1280, out_features=200)
+        self.affine_query_dialogs = nn.Linear(in_features=12800, out_features=200)
         self.affine_out = nn.Linear(in_features=400, out_features=1)
 
         self.init_weights()
@@ -132,25 +133,12 @@ class ourModel (nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained('./mc_bert_base/')
         self.bert_model =  BertModel.from_pretrained('./mc_bert_base/', output_hidden_states=False)
 
-    def process_dialogues(self, batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model):
-        batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
-        cur_batch_dr_dialogs_emb = []
-        for batch_idx in range(batch_size):
-            #print("================", batch_idx, "================")
-            #print("batch_diagolues_input_ids[:,dialog_idx,:]: ", batch_diagolues_input_ids[batch_idx,:,:].shape)
-            #print("batch_diagolues_attention_mask[:,dialog_idx,:]: ", batch_diagolues_attention_mask[batch_idx,:,:].shape)
-            #print("batch_diagolues_token_type_ids[:,dialog_idx,:]: ", batch_diagolues_token_type_ids[batch_idx,:,:].shape)
-
-            batch_dialogs = {"input_ids": batch_dialogs_input_ids[batch_idx,:,:].cuda(), \
-                          "attention_mask": batch_dialogs_attention_mask[batch_idx,:,:].cuda(), \
-                          "token_type_ids": batch_dialogs_token_type_ids[batch_idx,:,:].cuda()}
-            # take avery of last hidden layer: 1 * emb_size
-            output_cur_dialogs_emb = model.bert_model(**batch_dialogs)[0]
-
-            #print("output_cur_dialog_emb:", output_cur_dialog_emb.shape)
-            cur_batch_dr_dialogs_emb.append(torch.mean(output_cur_dialogs_emb, dim=1))
-        cur_batch_dialogs_emb = torch.stack(cur_batch_dr_dialogs_emb, dim = 0)    
-        return cur_batch_dialogs_emb
+    def get_dialog_sent_masks(self, batch_dialogs_attention_mask):
+        batch_dialogs_mask = []
+        for i in range(batch_dialogs_attention_mask.shape[0]):
+            batch_dialogs_mask.append(torch.where(torch.sum(batch_dialogs_attention_mask[i], dim=1) != 0, torch.tensor(1).cuda(), torch.tensor(0).cuda()))
+        batch_dialogs_mask = torch.stack(batch_dialogs_mask)
+        return batch_dialogs_mask
     
     def forward(self, batch_query_emb, batch_profile_emb, batch_dialogs_emb, \
          batch_query_mask, batch_profile_mask, batch_dialogs_mask):
@@ -158,21 +146,22 @@ class ourModel (nn.Module):
         #  print("query", batch_query_mask.shape)
         #  print("profile", batch_profile_mask.shape) 
         #  print("dialogs", batch_dialogs_mask.shape) 
-         query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
-         query_profile_similarity_matrix = torch.bmm(batch_query_emb, batch_profile_emb.transpose(1,2))
-         query_profile_similarity_matrix = query_profile_similarity_matrix.masked_fill_(query_profile_attn_mask_, 0)
+        query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
+        query_profile_similarity_matrix = torch.bmm(batch_query_emb, batch_profile_emb.transpose(1,2))
+        query_profile_similarity_matrix = query_profile_similarity_matrix.masked_fill_(query_profile_attn_mask_, 0) # batch_size * query_max_len * profile_max_len
+
 
         # query_dialogs_attn_similarity_matrix = torch.bmm(persona_attn_output, response_attn_output.transpose(1,2))
         # query_dialogs_attn_similarity_matrix = query_dialogs_attn_similarity_matrix.masked_fill_(query_dialogs_attn_mask, 0)
-         query_dialogs_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
-         query_dialogs_similarity_matrix = torch.bmm(batch_query_emb, batch_dialogs_emb.transpose(1,2))
-         query_dialogs_similarity_matrix = query_dialogs_similarity_matrix.masked_fill_(query_dialogs_attn_mask_, 0)
+        query_dialogs_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
+        query_dialogs_similarity_matrix = torch.bmm(batch_query_emb, batch_dialogs_emb.transpose(1,2))
+        query_dialogs_similarity_matrix = query_dialogs_similarity_matrix.masked_fill_(query_dialogs_attn_mask_, 0)
         #  print("query_profile_similarity_matrix", query_profile_similarity_matrix.shape)
-        #  print("query_dialogs_similarity_matrix", query_dialogs_similarity_matrix.shape)
+        # print("query_dialogs_similarity_matrix", query_dialogs_similarity_matrix.shape)
 
         
-         output = self.cnn_block(query_profile_similarity_matrix, query_dialogs_similarity_matrix)
-         return output.squeeze()
+        output = self.cnn_block(query_profile_similarity_matrix, query_dialogs_similarity_matrix)
+        return output.squeeze()
 
 def train_epoch(train_dataloader, optimizer, model, tag):
 
@@ -180,44 +169,19 @@ def train_epoch(train_dataloader, optimizer, model, tag):
 
     for batch, labels in tqdm(train_dataloader):
         labels = labels.cuda()
-        batch_profile_input_ids, batch_profile_token_type_ids, batch_profile_attention_mask = batch[0].squeeze().cuda(), batch[1].squeeze().cuda(), batch[2].squeeze().float().cuda()
-        batch_query_input_ids, batch_query_token_type_ids, batch_query_attention_mask =  batch[3].squeeze().cuda(), batch[4].squeeze().cuda(), batch[5].squeeze().float().cuda()
-        batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask = batch[6], batch[7], batch[8].float()
-        # print("batch_profile_input_ids: ", batch_profile_input_ids.shape)
-        # print("batch_profile_token_type_ids: ", batch_profile_token_type_ids.shape)
-        # print("batch_profile_attention_mask: ", batch_profile_attention_mask.shape)
-        
-        # print("batch_query_input_ids: ", batch_query_input_ids.shape)
-        # print("batch_query_token_type_ids: ", batch_query_token_type_ids.shape)
-        # print("batch_query_attention_mask: ", batch_query_attention_mask.shape)
+        batch = tuple(t.cuda() for t in batch)
 
-        # print("batch_diagolues_input_ids: ", batch_dialogs_input_ids.shape)
-        # print("batch_diagolues_token_type_ids: ", batch_dialogs_token_type_ids.shape)
-        # print("batch_diagolues_attention_mask: ", batch_dialogs_attention_mask.shape)
+        batch_profile_embed, batch_profile_attention_mask = batch[0], batch[1].float()
+        batch_query_embed, batch_query_attention_mask = batch[2], batch[3].float()
+        batch_dialogs_embed, batch_dialogs_attention_mask = batch[4], batch[5].float()
+        # print("batch_dialogs_attnetion_mask", batch_dialogs_attention_mask.shape)
+        batch_size, dr_dialog_num, max_len = batch_dialogs_embed.shape
 
-        # print("labels: ", labels)
-        # print("labels: ", labels.shape)
-
-        # batch_profile = {"input_ids": batch[0], "attention_mask": batch[1], "token_type_ids": batch[2]}
-        batch_profile = {"input_ids": batch_profile_input_ids, "attention_mask": batch_profile_attention_mask, "token_type_ids": batch_profile_token_type_ids}
-        batch_query = {"input_ids": batch_query_input_ids, "attention_mask": batch_query_attention_mask, "token_type_ids": batch_query_token_type_ids}
-        
-
-        output_profile_emb = model.bert_model(**batch_profile)[0] # batch_size, max_len, emb_size, take last_hidden_status
-        output_query_emb = model.bert_model(**batch_query)[0] # batch_size, max_len, emb_size, take last_hidden_status
-        
-        # print("output_profile_emb: ", output_profile_emb.shape)
-        # print("output_query_emb: ", output_query_emb.shape)
-
-        batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
-        batch_dialogs_emb = model.process_dialogues(batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask, model)
-
-        batch_dialogs_attention_mask_fake = batch[9].float().cuda()
+        batch_dialogs_mask = model.get_dialog_sent_masks(batch_dialogs_attention_mask).float()
 
         if tag == "train":
             optimizer.zero_grad()
-        logits = model(output_query_emb, output_profile_emb, batch_dialogs_emb, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_attention_mask_fake)
-        #pred_scores = model(features, args.dr_dialog_sample)
+        logits = model(batch_query_embed, batch_profile_embed, batch_dialogs_embed, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
         loss = F.binary_cross_entropy_with_logits(logits, labels)
         # print("loss", loss)
         # print("logits", logits)
@@ -270,7 +234,7 @@ def test_process(test_dataloader, model):
         # print("batch_dialog_emb: ", batch_dialogs_emb.shape)
         batch_dialogs_attention_mask_fake = torch.ones(batch_dialogs_attention_mask.shape[0], batch_dialogs_attention_mask.shape[1]).cuda()
 
-        logits = model(output_query_emb, output_profile_emb, batch_dialogs_emb, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_attention_mask_fake)
+        logits = model(output_query_emb, output_profile_emb, batch_dialogs_emb, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
 
         logits_list.append(logits)
     return logits_list

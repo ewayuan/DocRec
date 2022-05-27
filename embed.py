@@ -26,13 +26,10 @@ if args.model == 'bert':
     if n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
-def convert_sent_to_id(model, tokenizer, device, id_content, max_len, output_path):
+def convert_sent_to_embed(model, tokenizer, device, id_content, max_len, output_path, type):
     con_emb_dict = {}
     for idx, content in tqdm(id_content.items(), desc=output_path):
-
         if pd.isna(content):
-            print("idx: ", idx)
-            print("content: ", content)
             continue
         encoded = tokenizer.encode_plus(
                 text=content,  # the sentence to be encoded
@@ -42,12 +39,15 @@ def convert_sent_to_id(model, tokenizer, device, id_content, max_len, output_pat
                 truncation=True,
                 return_attention_mask = True,  # Generate the attention mask
                 return_tensors = 'pt',  # ask the function to return PyTorch tensors
-        )
-        input_ids = encoded["input_ids"]
-        token_type_ids = encoded["token_type_ids"]
-        attention_mask = encoded["attention_mask"]
-        con_emb_dict[idx] = encoded
-        # print("con_emb_dict: ", con_emb_dict)
+        ).to(device)
+        output = model(**encoded)[0]
+        mask = encoded['attention_mask'].squeeze()
+        output = output.masked_fill(mask.unsqueeze(-1) == 0, 0).squeeze()
+        if type == "dialogues":
+            mean_embed = (output * mask.unsqueeze(-1)).sum(dim=0) / mask.sum(dim=0)
+            con_emb_dict[idx] = {"embedding": mean_embed.detach().cpu().numpy(), "attention_mask": mask.detach().cpu().numpy()}
+        else:
+            con_emb_dict[idx] = {"embedding": output.detach().cpu().numpy(), "attention_mask": mask.detach().cpu().numpy()}
     util.save_pickle(con_emb_dict, output_path)
 
 
@@ -71,8 +71,8 @@ def main():
         if not os.path.exists(cleaned_path):
             os.makedirs(cleaned_path)
 
-        convert_sent_to_id(model, tokenizer, device, id_profile, 256, f'{cleaned_path}/profile_ids_mini.pkl')
-        convert_sent_to_id(model, tokenizer, device, id_q, 256, f'{cleaned_path}/q_ids_mini.pkl')
-        convert_sent_to_id(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_ids_mini.pkl')
+        convert_sent_to_embed(model, tokenizer, device, id_profile, 128, f'{cleaned_path}/profile_ids_mini.pkl', "profile")
+        convert_sent_to_embed(model, tokenizer, device, id_q, 128, f'{cleaned_path}/q_ids_mini.pkl', "query")
+        convert_sent_to_embed(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_ids_mini.pkl', "dialogues")
 if __name__ == '__main__':
     main()
