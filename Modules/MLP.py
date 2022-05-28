@@ -191,7 +191,7 @@ def train_epoch(train_dataloader, optimizer, model, tag):
             loss.backward()
             optimizer.step()
         epoch_loss.append(loss.item())
-        return epoch_loss
+    return epoch_loss
 
 def test_process(test_dataloader, model):
 

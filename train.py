@@ -32,7 +32,7 @@ parser.add_argument('--name', default="med-bert", type=str)
 parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
-parser.add_argument('--neg_sample', default=1, type=int)
+parser.add_argument('--neg_sample', default=10, type=int)
 parser.add_argument('--batch_size', default=16, type=int)
 parser.add_argument('--lr', default=2e-5, type=int)
 parser.add_argument('--patience', default=7, type=int)
@@ -69,7 +69,7 @@ def train_model(model, train_dataloader, val_dataloader):
 
     train_losses = []
     valid_losses = []
-    for epoch in trange(args.epoch_num):
+    for epoch in range(args.epoch_num):
         print(f'Current Epoch: {epoch+1}')
         model.train()
         train_losses = train_epoch(train_dataloader, optimizer, model, "train")
@@ -107,23 +107,21 @@ def main():
     print("The length of dialogues: ", len(dialogue))
 
     print('Building training dataset and dataloader...')
-    train_set = pd.read_csv(f'./dataset/train_mini.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
+    train_set = pd.read_csv(f'./dataset/train_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
     train_dataset = DoctorRecDataset(
         'train', train_set, profile, query, dialogue,
         dr_dialog_sample=args.dr_dialog_sample, neg_sample=args.neg_sample
     )
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    del train_set, train_dataset
     print('Done')
 
     print('Building validation dataset and dataloader...')
-    valid_set = pd.read_csv(f'./dataset/valid_mini.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
+    valid_set = pd.read_csv(f'./dataset/valid_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
     val_dataset = DoctorRecDataset(
         'valid', valid_set, profile, query, dialogue,
         dr_dialog_sample=args.dr_dialog_sample, neg_sample=args.neg_sample
     )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-    del valid_set, val_dataset, profile, query, dialogue
     print('Done')
 
     model = ourModel().cuda()
