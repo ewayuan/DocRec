@@ -18,7 +18,10 @@ class DoctorRecDataset(Dataset):
         self.profile_emb = profile
         self.q_emb = query
         self.dialog_emb = dialogue
-        train_set = pd.read_csv('./dataset/train_mini.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id':str})
+        if split == "train":
+            train_set = pd.read_csv('./dataset/train_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id':str})
+        elif split == "valid":
+            train_set = pd.read_csv('./dataset/valid_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id':str})
         self.most_common_drs = [dr for dr, _ in Counter(train_set.dr_id.tolist()).most_common()]
         self.train_q_dr_match = dict(zip(train_set.dialog_id, train_set.dr_id))
         del train_set
