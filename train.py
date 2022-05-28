@@ -94,9 +94,9 @@ def main():
     start = time.time()
     profile = load_pickle(f'{args.cleaned_path}/profile_embeds.pkl')
     print("Loaded profile ids")
-    query = load_pickle(f'{args.cleaned_path}/q_ids_embeds.pkl')
+    query = load_pickle(f'{args.cleaned_path}/q_embeds.pkl')
     print("Loaded query ids")
-    dialogue = load_pickle(f'{args.cleaned_path}/dialog_ids_embeds.pkl')
+    dialogue = load_pickle(f'{args.cleaned_path}/dialog_embeds.pkl')
     print("Loaded dialogue ids")
     
     end  = time.time()
