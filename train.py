@@ -11,8 +11,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP import ourModel
-from Modules.MLP import train_epoch
+from Modules.MLP_interaction import ourModel
+from Modules.MLP_interaction import train_epoch
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
