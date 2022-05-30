@@ -41,3 +41,8 @@ saved_model/ckpt/model_7.pt
 saved_model/ckpt/model_8.pt
 saved_model/ckpt/model_9.pt
 saved_model/ckpt/model_10.pt
+wyuancs@cedar.computecanada.ca/q_ids_mini.pkl
+wyuancs@cedar.computecanada.ca/profile_ids_mini.pkl
+cleaned/dialog_embeds.pkl
+cleaned/profile_embeds.pkl
+cleaned/q_embeds.pkl

@@ -130,9 +130,7 @@ class ourModel (nn.Module):
     def __init__(self):
         super(ourModel, self).__init__()
         self.cnn_block = cnnBlock()
-        self.tokenizer = BertTokenizer.from_pretrained('./mc_bert_base/')
-        self.bert_model =  BertModel.from_pretrained('./mc_bert_base/', output_hidden_states=False)
-
+        
     def get_dialog_sent_masks(self, batch_dialogs_attention_mask):
         batch_dialogs_mask = []
         for i in range(batch_dialogs_attention_mask.shape[0]):
@@ -192,7 +190,7 @@ def train_epoch(train_dataloader, optimizer, model, tag):
             loss.backward()
             optimizer.step()
         epoch_loss.append(loss.item())
-        return epoch_loss
+    return epoch_loss
 
 def test_process(test_dataloader, model):
 

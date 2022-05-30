@@ -52,10 +52,10 @@ def convert_sent_to_embed(model, tokenizer, device, id_content, max_len, output_
 
 
 def main():
-    df = pd.read_csv(f'./dataset/embed_mini.csv', delimiter='\t', encoding='utf-8')
+    df = pd.read_csv(f'./dataset/embed_cleaned.csv', delimiter='\t', encoding='utf-8')
     df = df[['dr_id', 'dialog_id', 'q', 'parsed_dialog']]
     id_profile = {}
-    with open(f'./dataset/dr_profile_mini.jsonl', 'r', encoding='utf-8') as f:
+    with open(f'./dataset/dr_profile.jsonl', 'r', encoding='utf-8') as f:
         for line in f.readlines():
             line = json.loads(line)
             id_profile[line['id']] = line['goodat'] # use goodat as doctor profile
@@ -71,8 +71,8 @@ def main():
         if not os.path.exists(cleaned_path):
             os.makedirs(cleaned_path)
 
-        convert_sent_to_embed(model, tokenizer, device, id_profile, 128, f'{cleaned_path}/profile_ids_mini.pkl', "profile")
-        convert_sent_to_embed(model, tokenizer, device, id_q, 128, f'{cleaned_path}/q_ids_mini.pkl', "query")
-        convert_sent_to_embed(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_ids_mini.pkl', "dialogues")
+        convert_sent_to_embed(model, tokenizer, device, id_profile, 128, f'{cleaned_path}/profile_embeds.pkl', "profile")
+        convert_sent_to_embed(model, tokenizer, device, id_q, 128, f'{cleaned_path}/q_ids_embeds.pkl', "query")
+        convert_sent_to_embed(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_ids_embeds.pkl', "dialogues")
 if __name__ == '__main__':
     main()
