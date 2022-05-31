@@ -62,10 +62,10 @@ class cnnBlock(nn.Module):
         self.affine_query_profile = nn.Linear(in_features=900, out_features=200)
         self.relu = nn.ReLU()
 
-        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
-        self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1,1))
-        self.maxpooling_query_dialogs_1 = nn.MaxPool2d(kernel_size=(1, 1), stride=(1, 1))
-        self.affine_query_dialogs = nn.Linear(in_features=12800, out_features=200)
+        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3,3))
+        self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3,3))
+        self.maxpooling_query_dialogs_1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.affine_query_dialogs = nn.Linear(in_features=690, out_features=200)
         self.affine_out = nn.Linear(in_features=400, out_features=1)
 
         self.init_weights()
@@ -79,6 +79,8 @@ class cnnBlock(nn.Module):
         init.xavier_normal_(self.cnn_2d_query_dialogs_2.weight)
         init.xavier_normal_(self.affine_query_dialogs.weight)
 
+        init.xavier_normal_(self.affine_query_profile.weight)
+        init.xavier_normal_(self.affine_query_dialogs.weight)
         init.xavier_normal_(self.affine_out.weight)
 
     def cnn_query_profile(self, matrix):
@@ -117,10 +119,12 @@ class cnnBlock(nn.Module):
 
         query_profile_V = self.cnn_query_profile(query_profile_similarity_matrix)
         # print("query_profile_V", query_profile_V.shape)
+        # print("query_profile_V", query_profile_V)
+
 
         query_dialogs_V = self.cnn_query_dialogs(query_dialogs_similarity_matrix)
         # print("query_dialogs_V", query_dialogs_V.shape)
-
+        # print("query_dialogs_V", query_dialogs_V)
         all_concat = torch.cat([query_profile_V, query_dialogs_V], dim=-1)
         matching_output = self.affine_out(all_concat)
 
@@ -158,8 +162,9 @@ class ourModel (nn.Module):
         #  print("query_profile_similarity_matrix", query_profile_similarity_matrix.shape)
         # print("query_dialogs_similarity_matrix", query_dialogs_similarity_matrix.shape)
 
-        
+    
         output = self.cnn_block(query_profile_similarity_matrix, query_dialogs_similarity_matrix)
+        
         return output.squeeze()
 
 def train_epoch(train_dataloader, optimizer, model, tag):
@@ -195,7 +200,8 @@ def train_epoch(train_dataloader, optimizer, model, tag):
 def test_process(test_dataloader, model):
 
     logits_list = []
-
+    num_ok = 0
+    total_num = len(test_dataloader.dataset)
     for batch, labels in tqdm(test_dataloader):
         batch = tuple(t.cuda() for t in batch)
         labels = labels.cuda()
@@ -203,12 +209,22 @@ def test_process(test_dataloader, model):
         batch_query_emb, batch_query_attention_mask = batch[2], batch[3].float()
         batch_dialogs_emb, batch_dialogs_attention_mask = batch[4], batch[5].float()
         batch_size, dr_dialog_num, max_len = batch_dialogs_emb.shape
+        # print("batch_profile_emb: ", batch_profile_emb.shape)
+        # print("batch_query_emb: ", batch_query_emb.shape)
+        # print("batch_dialogs_emb: ", batch_dialogs_emb.shape)
+        # print("batch_profile_emb: ", batch_profile_emb)
+        # print("batch_query_emb: ", batch_query_emb)
+        # print("batch_dialogs_emb: ", batch_dialogs_emb)
 
         batch_dialogs_mask = model.get_dialog_sent_masks(batch_dialogs_attention_mask).float()
        
-        batch_size, dr_dialog_num, max_len = batch_dialogs_input_ids.shape
-        batch_dialogs_emb = self.process_dialogues(batch_dialogs_input_ids, batch_dialogs_token_type_ids, batch_dialogs_attention_mask)
+        
         # print("batch_dialog_emb: ", batch_dialogs_emb.shape)
         logits = model(batch_query_emb, batch_profile_emb, batch_dialogs_emb, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
+        # print("logits", logits.shape)
+        # print("logits", logits)
         logits_list.append(logits)
+        if logits.float().argmax(dim=0) == 0:
+            num_ok += 1
+    print("Testing Accuracy: ", num_ok/total_num)
     return logits_list

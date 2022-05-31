@@ -46,3 +46,16 @@ wyuancs@cedar.computecanada.ca/profile_ids_mini.pkl
 cleaned/dialog_embeds.pkl
 cleaned/profile_embeds.pkl
 cleaned/q_embeds.pkl
+test.dat
+saved_model/test_model_10.pt_score.txt
+Modules/__pycache__/MLP_interaction.cpython-38.pyc
+saved_model/test_5_model.pt_score.txt
+saved_model/test_model_1.pt_score.txt
+saved_model/ckpt/best_model.pt
+saved_model/ckpt/model_11.pt
+saved_model/ckpt/model_12.pt
+saved_model/ckpt/model_13.pt
+saved_model/ckpt/model_14.pt
+saved_model/ckpt/model_15.pt
+saved_model/ckpt/model_16.pt
+saved_model/sorted_test_5_model.pt.dat

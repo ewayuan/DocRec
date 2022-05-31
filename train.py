@@ -11,8 +11,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP_interaction import ourModel
-from Modules.MLP_interaction import train_epoch
+from Modules.MLP import ourModel
+from Modules.MLP import train_epoch
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -33,11 +33,11 @@ parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
 parser.add_argument('--neg_sample', default=10, type=int)
-parser.add_argument('--batch_size', default=64, type=int)
-parser.add_argument('--lr', default=2e-5, type=int)
-parser.add_argument('--patience', default=7, type=int)
+parser.add_argument('--batch_size', default=1024, type=int)
+parser.add_argument('--lr', default=2e-5, type=float)
+parser.add_argument('--patience', default=5, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
-parser.add_argument('--epoch_num', default=10, type=int)
+parser.add_argument('--epoch_num', default=20, type=int)
 
 
 args = parser.parse_args()
@@ -53,19 +53,9 @@ print(f'Training: randome seed {args.seed}, experiment name: {args.name}, run on
 
 def train_model(model, train_dataloader, val_dataloader):
     print(f'{args.name} start training...')
-    no_decay = ["bias", "LayerNorm.weight"]
-    weight_decay = 0
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": weight_decay,
-        },
-        {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": 0.0},
-    ]
-    optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=args.lr, eps=1e-8, weight_decay=0)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=args.patience, threshold=1e-4, min_lr=1e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, eps=1e-8)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=args.patience, threshold=1e-4, min_lr=5e-5)
     early_stopping = EarlyStopping(patience = args.patience, verbose = True, path = f'{args.output_dir}/ckpt/best_model.pt')
-
 
     train_losses = []
     valid_losses = []
