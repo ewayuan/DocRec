@@ -33,7 +33,7 @@ parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
 parser.add_argument('--neg_sample', default=10, type=int)
-parser.add_argument('--batch_size', default=1024, type=int)
+parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--lr', default=2e-5, type=float)
 parser.add_argument('--patience', default=5, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)

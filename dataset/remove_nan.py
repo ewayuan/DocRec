@@ -10,10 +10,15 @@ def remove_nan(csv):
     return df
 
 def main():
-    remove_nan("embed.csv")
-    remove_nan("train.csv")
-    remove_nan("test.csv")
-    remove_nan("valid.csv")
+    # remove_nan("embed.csv")
+    # remove_nan("train.csv")
+    # remove_nan("test.csv")
+    # remove_nan("valid.csv")
+    
+    remove_nan("embed_mini.csv")
+    remove_nan("train_mini.csv")
+    remove_nan("test_mini.csv")
+    remove_nan("valid_mini.csv")
 
 
 if __name__ == '__main__':

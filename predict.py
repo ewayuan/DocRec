@@ -30,7 +30,7 @@ parser.add_argument('--patience', default=7, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=10, type=int)
 
-parser.add_argument('--eval_model', default="model_5.pt", type=str)
+parser.add_argument('--eval_model', default="model_2.pt", type=str)
 
 args = parser.parse_args()
 
@@ -80,7 +80,8 @@ def main():
         with torch.no_grad():
             pred_scores = test_process(test_dataloader, model)
             for pred_score in pred_scores:
-                print(pred_score.cpu().detach().numpy().tolist(), file = score)
+                for logit in pred_score:
+                    print(logit.cpu().detach().numpy().tolist(), file = score)
 
 if __name__ == '__main__':
     main()

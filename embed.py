@@ -42,7 +42,7 @@ def convert_sent_to_embed(model, tokenizer, device, id_content, max_len, output_
         ).to(device)
         output = model(**encoded)[0]
         mask = encoded['attention_mask'].squeeze()
-        output = output.masked_fill(mask.unsqueeze(-1) == 0, 0).squeeze()
+        output = output.masked_fill(mask.unsqueeze(-1) == 0, 5e-5).squeeze()
         if type == "dialogues":
             mean_embed = (output * mask.unsqueeze(-1)).sum(dim=0) / mask.sum(dim=0)
             con_emb_dict[idx] = {"embedding": mean_embed.detach().cpu().numpy(), "attention_mask": mask.detach().cpu().numpy()}
@@ -72,7 +72,7 @@ def main():
             os.makedirs(cleaned_path)
 
         convert_sent_to_embed(model, tokenizer, device, id_profile, 128, f'{cleaned_path}/profile_embeds.pkl', "profile")
-        convert_sent_to_embed(model, tokenizer, device, id_q, 128, f'{cleaned_path}/q_ids_embeds.pkl', "query")
-        convert_sent_to_embed(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_ids_embeds.pkl', "dialogues")
+        convert_sent_to_embed(model, tokenizer, device, id_q, 128, f'{cleaned_path}/q_embeds.pkl', "query")
+        convert_sent_to_embed(model, tokenizer, device, id_dialog, 512, f'{cleaned_path}/dialog_embeds.pkl', "dialogues")
 if __name__ == '__main__':
     main()
