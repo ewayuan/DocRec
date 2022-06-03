@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.nn.init as init
 
 from tqdm import tqdm
+from utils.loss import weighted_class_bceloss
 
 from transformers import AdamW, BertModel, BertTokenizer, get_linear_schedule_with_warmup
 
@@ -15,21 +16,30 @@ import logging
 class simpleBlock(nn.Module):
     def __init__(self):
         super(simpleBlock, self).__init__()
-        self.affine_out = nn.Linear(in_features=1536, out_features=1)
+        self.in_size = 768
+        self.hid_size = 256
+        self.relu= nn.ReLU()
+        self.bn1 = nn.BatchNorm1d(num_features=self.hid_size)
+        self.fc1 = nn.Linear(self.in_size * 3, self.hid_size)
+        self.fc2 = nn.Linear(self.hid_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.init_weights()
 
     def init_weights(self):
-        init.xavier_normal_(self.affine_out.weight)
+        init.xavier_normal_(self.fc1.weight)
+        init.xavier_normal_(self.fc2.weight)
 
-    def forward(self, query_emb, profile_emb, query_mask, profile_mask):
+    def forward(self, query_emb, profile_emb, dialogue_emb, query_mask, profile_mask, dialogue_mask):
 
         query_V = torch.mean(query_emb, dim=1)
         profile_V = torch.mean(profile_emb, dim=1)
-        all_concat = torch.cat([query_V, profile_V], dim=-1)
-        matching_output = self.affine_out(all_concat)
-        output = self.sigmoid(matching_output)
-        return output.squeeze()
+        dialogue_V = torch.mean(dialogue_emb, dim=1)
+        
+        features = torch.cat([query_V, profile_V, dialogue_V], dim=1)
+        features = self.relu(self.bn1(self.fc1(features)))
+        output = self.fc2(features)
+        output = self.sigmoid(output)
+        return output
 
 class ourModel (nn.Module):
     def __init__(self):
@@ -45,10 +55,10 @@ class ourModel (nn.Module):
     
     def forward(self, batch_query_emb, batch_profile_emb, batch_dialogs_emb, \
          batch_query_mask, batch_profile_mask, batch_dialogs_mask):
-        output = self.simpleBlock(batch_query_emb, batch_profile_emb, batch_query_mask, batch_profile_mask)
+        output = self.simpleBlock(batch_query_emb, batch_profile_emb, batch_dialogs_emb, batch_query_mask, batch_profile_mask, batch_dialogs_mask)
         return output.squeeze()
 
-def train_epoch(train_dataloader, optimizer, model, tag):
+def train_epoch(train_dataloader, optimizer, model, tag, weights):
     epoch_loss = []
     loss_fun = nn.BCELoss()
     for batch, labels in tqdm(train_dataloader):
@@ -67,7 +77,7 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         logits = model(batch_query_embed, batch_profile_embed, batch_dialogs_embed, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
         #print("labels", labels)
         #print("logits", logits)
-        loss = loss_fun(logits, labels)
+        loss = loss_fun(logits.reshape(-1, 1), labels.reshape(-1, 1))
         #print("loss", loss)
 
         if tag == "train":
