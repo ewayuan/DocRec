@@ -11,8 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP import ourModel
-from Modules.MLP import train_epoch
+from Modules.MLP_add_interaction import ourModel, train_epoch
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -26,7 +25,7 @@ from transformers import AdamW, BertModel, BertTokenizer, get_linear_schedule_wi
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=2021, type=int)
 parser.add_argument('--gpu', default=0, type=int)
-parser.add_argument('--n_gpu', default=4, type=int)
+parser.add_argument('--n_gpu', default=1, type=int)
 
 parser.add_argument('--name', default="med-bert", type=str)
 parser.add_argument('--cleaned_path', default='./cleaned', type=str)
@@ -34,7 +33,7 @@ parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
 parser.add_argument('--neg_sample', default=10, type=int)
 parser.add_argument('--batch_size', default=256, type=int)
-parser.add_argument('--lr', default=2e-5, type=float)
+parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--patience', default=5, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=20, type=int)
@@ -53,6 +52,7 @@ print(f'Training: randome seed {args.seed}, experiment name: {args.name}, run on
 
 def train_model(model, train_dataloader, val_dataloader):
     print(f'{args.name} start training...')
+    weights = torch.Tensor([1, 5]).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, eps=1e-8)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=args.patience, threshold=1e-4, min_lr=5e-5)
     early_stopping = EarlyStopping(patience = args.patience, verbose = True, path = f'{args.output_dir}/ckpt/best_model.pt')

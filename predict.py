@@ -30,7 +30,7 @@ parser.add_argument('--patience', default=7, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=10, type=int)
 
-parser.add_argument('--eval_model', default="model_2.pt", type=str)
+parser.add_argument('--eval_model', default="model_1.pt", type=str)
 
 args = parser.parse_args()
 
