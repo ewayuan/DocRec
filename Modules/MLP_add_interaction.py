@@ -233,7 +233,7 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         epoch_loss.append(loss.item())
     return epoch_loss
 
-def valid_epoch(valid_dataloader, optimizer, model, tag):
+def valid_epoch(valid_dataloader, model, tag):
 
     epoch_loss = []
     loss_fun = nn.BCELoss()
@@ -251,8 +251,6 @@ def valid_epoch(valid_dataloader, optimizer, model, tag):
 
         batch_dialogs_mask = model.get_dialog_sent_masks(batch_dialogs_attention_mask).float()
  
-        if tag == "train":
-            optimizer.zero_grad()
         logits = model(batch_query_embed, batch_profile_embed, batch_dialogs_embed, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
         if logits.float().argmax(dim=0) == 0:
             num_ok += 1
