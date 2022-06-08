@@ -61,8 +61,8 @@ def train_model(model, train_dataloader, val_dataloader):
     valid_losses = []
     for epoch in range(args.epoch_num):
         print(f'Current Epoch: {epoch+1}')
-        # model.train()
-        # train_losses = train_epoch(train_dataloader, optimizer, model, "train")
+        model.train()
+        train_losses = train_epoch(train_dataloader, optimizer, model, "train")
         model.eval()
         with torch.no_grad():
             valid_losses = valid_epoch(val_dataloader, model, "valid")
