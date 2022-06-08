@@ -102,7 +102,7 @@ class DoctorRecDataset(Dataset):
             # negtive sampling
             neg_drs = self.dr_list[:]
             neg_drs.remove(pos_dr)
-            if self.split != 'test':
+            if self.split == 'train':
                 neg_drs = sample(neg_drs, self.neg_sample)
             else:
                 neg_drs = self.most_common_drs[:]

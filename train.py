@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP_add_interaction import ourModel, train_epoch
+from Modules.MLP_add_interaction import ourModel, train_epoch, valid_epoch, test_process
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -65,7 +65,7 @@ def train_model(model, train_dataloader, val_dataloader):
         train_losses = train_epoch(train_dataloader, optimizer, model, "train")
         model.eval()
         with torch.no_grad():
-            valid_losses = train_epoch(val_dataloader, optimizer, model, "valid")
+            valid_losses = valid_epoch(val_dataloader, model)
         
         train_loss = np.average(train_losses)
         valid_loss = np.average(valid_losses)
@@ -111,7 +111,7 @@ def main():
         'valid', valid_set, profile, query, dialogue,
         dr_dialog_sample=args.dr_dialog_sample, neg_sample=args.neg_sample
     )
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=101, shuffle=False)
     print('Done')
 
     model = ourModel().cuda()

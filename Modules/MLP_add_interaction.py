@@ -233,6 +233,35 @@ def train_epoch(train_dataloader, optimizer, model, tag):
         epoch_loss.append(loss.item())
     return epoch_loss
 
+def valid_epoch(valid_dataloader, optimizer, model, tag):
+
+    epoch_loss = []
+    loss_fun = nn.BCELoss()
+    total_num = 0
+    for batch, labels in tqdm(valid_dataloader):
+        labels = labels.cuda()
+        # print("labels", labels)
+        batch = tuple(t.cuda() for t in batch)
+
+        batch_profile_embed, batch_profile_attention_mask = batch[0], batch[1].float()
+        batch_query_embed, batch_query_attention_mask = batch[2], batch[3].float()
+        batch_dialogs_embed, batch_dialogs_attention_mask = batch[4], batch[5].float()
+        # print("batch_dialogs_attnetion_mask", batch_dialogs_attention_mask.shape)
+        batch_size, dr_dialog_num, max_len = batch_dialogs_embed.shape
+
+        batch_dialogs_mask = model.get_dialog_sent_masks(batch_dialogs_attention_mask).float()
+ 
+        if tag == "train":
+            optimizer.zero_grad()
+        logits = model(batch_query_embed, batch_profile_embed, batch_dialogs_embed, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
+        if logits.float().argmax(dim=0) == 0:
+            num_ok += 1
+        total_num += 1
+        loss = loss_fun(logits, labels)
+        epoch_loss.append(loss.item())
+    print("Validation Accuracy: ", num_ok/total_num)
+    return epoch_loss
+    
 def test_process(test_dataloader, model):
 
     logits_list = []
