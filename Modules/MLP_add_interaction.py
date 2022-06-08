@@ -238,6 +238,7 @@ def valid_epoch(valid_dataloader, model, tag):
     epoch_loss = []
     loss_fun = nn.BCELoss()
     total_num = 0
+    num_ok = 0
     for batch, labels in tqdm(valid_dataloader):
         labels = labels.cuda()
         # print("labels", labels)
