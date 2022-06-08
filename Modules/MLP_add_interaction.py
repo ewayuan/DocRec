@@ -26,7 +26,7 @@ class TransformerBlock(nn.Module):
         self.linear2 = nn.Linear(input_size, input_size)
         self.init_weights()
 
-    def init_weights(self):
+    def init_weights(self): 
         init.xavier_normal_(self.linear1.weight)
         init.xavier_normal_(self.linear2.weight)
 

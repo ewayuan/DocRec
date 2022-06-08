@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
 
-from Modules.MLP import ourModel, test_process
+from Modules.MLP_add_interaction import ourModel, test_process
 from utils.dataset import DoctorRecDataset
 from utils.config import init_opts, train_opts, eval_opts, multihead_att_opts
 from utils.util import load_pickle, save_pickle
@@ -30,7 +30,7 @@ parser.add_argument('--patience', default=7, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
 parser.add_argument('--epoch_num', default=10, type=int)
 
-parser.add_argument('--eval_model', default="model_1.pt", type=str)
+parser.add_argument('--eval_model', default="model_6.pt", type=str)
 
 args = parser.parse_args()
 
