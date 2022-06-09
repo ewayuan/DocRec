@@ -73,7 +73,7 @@ class cnnBlock(nn.Module):
         self.affine_query_dialogs = nn.Linear(in_features=12125, out_features=2000)
         
         self.bn1 = nn.BatchNorm1d(num_features=768)
-        self.fc1 = nn.Linear(in_features =2000 * 4, out_features = 768)
+        self.fc1 = nn.Linear(in_features =2000 * 6, out_features = 768)
         self.fc2 = nn.Linear(768, 1)
 
         self.sigmoid = nn.Sigmoid()
@@ -119,19 +119,20 @@ class cnnBlock(nn.Module):
         return output_V
 
     def forward(self, query_profile_similarity_matrix, query_dialogs_similarity_matrix,\
+                query_profile_self_attn_similarity_matrix, query_dialogs_self_attn_similarity_matrix,\
                 query_profile_interaction_simialrity_matrix, query_dialogs_interaction_simialrity_matrix):
         
         query_profile_V = self.cnn_query_profile(query_profile_similarity_matrix)
         query_profile_interaction_V = self.cnn_query_profile(query_profile_interaction_simialrity_matrix)
 
+        query_profile_self_attn_V = self.cnn_query_profile(query_profile_self_attn_similarity_matrix)
+        query_dialogs_self_attn_V = self.cnn_query_dialogs(query_dialogs_self_attn_similarity_matrix)
+
         query_dialogs_V = self.cnn_query_dialogs(query_dialogs_similarity_matrix)
         query_dialogs_interaction_V = self.cnn_query_dialogs(query_dialogs_interaction_simialrity_matrix)
 
-        # print("query_profile_V: ", query_profile_V)
-        # print("query_profile_interaction_V: ", query_profile_interaction_V)
-        # print("query_dialogs_V: ", query_dialogs_V)
-        # print("query_dialogs_interaction_V: ", query_dialogs_interaction_V)
-        features = torch.cat([query_profile_V, query_dialogs_V, query_profile_interaction_V, query_dialogs_interaction_V], dim=-1)
+
+        features = torch.cat([query_profile_V, query_dialogs_V, query_profile_self_attn_V, query_dialogs_self_attn_V, query_profile_interaction_V, query_dialogs_interaction_V], dim=-1)
         features = self.relu(self.bn1(self.fc1(features)))
         output = self.fc2(features)
         output = self.sigmoid(output)
@@ -173,6 +174,11 @@ class ourModel (nn.Module):
         batch_profile_emb_norm = torch.nn.functional.normalize(batch_profile_emb, dim=-1) 
         batch_dialogs_emb_norm = torch.nn.functional.normalize(batch_dialogs_emb, dim=-1) 
 
+        # Word level similarity matrix
+        query_profile_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_profile_emb_norm.transpose(1,2))
+        query_dialogs_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_dialogs_emb_norm.transpose(1,2))
+
+        # Self-Attention
         query_self_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_query_mask.unsqueeze(1)).bool()
         profile_self_attn_mask_ = ~torch.bmm(batch_profile_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
         dialogs_self_attn_mask_ = ~torch.bmm(batch_dialogs_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
@@ -181,9 +187,9 @@ class ourModel (nn.Module):
         batch_profile_self_attn = self.profile_self_transformer(batch_profile_emb_norm, batch_profile_emb_norm, batch_profile_emb_norm, profile_self_attn_mask_)
         batch_dialogs_self_attn = self.dialogs_self_transformer(batch_dialogs_emb_norm, batch_dialogs_emb_norm, batch_dialogs_emb_norm, dialogs_self_attn_mask_)
 
-        query_profile_similarity_matrix = torch.bmm(batch_query_self_attn, batch_profile_self_attn.transpose(1,2))
+        query_profile_self_attn_similarity_matrix = torch.bmm(batch_query_self_attn, batch_profile_self_attn.transpose(1,2))
 
-        query_dialogs_similarity_matrix = torch.bmm(batch_query_self_attn, batch_dialogs_self_attn.transpose(1,2))
+        query_dialogs_self_attn_similarity_matrix = torch.bmm(batch_query_self_attn, batch_dialogs_self_attn.transpose(1,2))
 
         # 2.Interaction
         query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
@@ -208,6 +214,7 @@ class ourModel (nn.Module):
         # print("query_dialogs_interaction_simialrity_matrix: ", query_dialogs_interaction_simialrity_matrix)
 
         output = self.cnn_block(query_profile_similarity_matrix, query_dialogs_similarity_matrix,\
+                                query_profile_self_attn_similarity_matrix, query_dialogs_self_attn_similarity_matrix,\
                                 query_profile_interaction_simialrity_matrix, query_dialogs_interaction_simialrity_matrix)
 
         return output.squeeze()
