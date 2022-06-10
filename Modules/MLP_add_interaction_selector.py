@@ -10,8 +10,7 @@ from tqdm import tqdm
 
 from transformers import AdamW, BertModel, BertTokenizer, get_linear_schedule_with_warmup
 
-import logging
-import GPUtil
+
 
 class TransformerBlock(nn.Module):
 
@@ -60,7 +59,7 @@ class TransformerBlock(nn.Module):
 class cnnBlock(nn.Module):
     def __init__(self):
         super(cnnBlock, self).__init__()
-        self.cnn_2d_query_profile_1 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(3,3))
+        self.cnn_2d_query_profile_1 = nn.Conv2d(in_channels=4, out_channels=4, kernel_size=(3,3))
         # self.cnn_2d_query_profile_2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(3,3))
         # self.cnn_2d_query_profile_3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3))
         # self.cnn_2d_query_profile_4 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3,3))
@@ -68,10 +67,10 @@ class cnnBlock(nn.Module):
         # self.maxpooling_query_profile_2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
         # self.maxpooling_query_profile_3 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
         # self.maxpooling_query_profile_4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
-        self.affine_query_profile = nn.Linear(in_features=125000, out_features=2000)
+        self.affine_query_profile = nn.Linear(in_features=62500, out_features=2000)
         self.relu = nn.ReLU()
 
-        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(3,3))
+        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=4, out_channels=4, kernel_size=(3,3))
         # self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(3,3))
         # self.cnn_2d_query_dialogs_3 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3))
         # self.cnn_2d_query_dialogs_4 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3,3))
@@ -79,7 +78,7 @@ class cnnBlock(nn.Module):
         # self.maxpooling_query_dialogs_2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
         # self.maxpooling_query_dialogs_3 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
         # self.maxpooling_query_dialogs_4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(1, 1))
-        self.affine_query_dialogs = nn.Linear(in_features=97000, out_features=2000)
+        self.affine_query_dialogs = nn.Linear(in_features=48500, out_features=2000)
         
         self.bn1 = nn.BatchNorm1d(num_features=768)
         self.fc1 = nn.Linear(in_features =2000 * 2, out_features = 768)
@@ -166,9 +165,11 @@ class cnnBlock(nn.Module):
         M_qp = torch.cat([M_query_profile, M_query_profile_attn], dim=1)
         M_qd = torch.cat([M_query_dialogs, M_query_dialogs_attn], dim=1)
 
-        query_profile_V = self.cnn_query_profile(M_qp)
+        # print("M_qp: ", M_qp)
+        # print("M_qd: ", M_qd)
+        query_profile_V = torch.nn.functional.normalize(self.cnn_query_profile(M_qp), dim=-1)
 
-        query_dialogs_V = self.cnn_query_dialogs(M_qd)
+        query_dialogs_V = torch.nn.functional.normalize(self.cnn_query_dialogs(M_qd), dim=-1)
 
         # print("query_profile_V: ", query_profile_V)
         # print("query_profile_interaction_V: ", query_profile_interaction_V)
@@ -185,15 +186,23 @@ class ourModel (nn.Module):
         super(ourModel, self).__init__()
         self.cnn_block = cnnBlock()
         self.embed_dim = 768
-        self.batch_size = 64
         self.query_transformer  = TransformerBlock(input_size=self.embed_dim)
         self.profile_transformer = TransformerBlock(input_size=self.embed_dim)
         self.dialogs_transformer = TransformerBlock(input_size=self.embed_dim)
 
-        self.A_query_profile = torch.randn((self.batch_size, self.embed_dim, self.embed_dim), requires_grad=True).cuda()
-        self.A_query_dialogs = torch.randn((self.batch_size, self.embed_dim, self.embed_dim), requires_grad=True).cuda()
-        self.A_query_profile_interaction = torch.randn((self.batch_size, self.embed_dim, self.embed_dim), requires_grad=True).cuda()
-        self.A_query_dialogs_interaction = torch.randn((self.batch_size, self.embed_dim, self.embed_dim), requires_grad=True).cuda()
+        self.A_query_profile = nn.Linear(self.embed_dim, self.embed_dim)
+        self.A_query_dialogs = nn.Linear(self.embed_dim, self.embed_dim)
+        self.A_query_profile_interaction = nn.Linear(self.embed_dim, self.embed_dim)
+        self.A_query_dialogs_interaction = nn.Linear(self.embed_dim, self.embed_dim)
+
+        self.init_weights()
+
+    def init_weights(self):
+
+        init.xavier_normal_(self.A_query_profile.weight)
+        init.xavier_normal_(self.A_query_dialogs.weight)
+        init.xavier_normal_(self.A_query_profile_interaction.weight)
+        init.xavier_normal_(self.A_query_dialogs_interaction.weight)
 
     def get_dialog_sent_masks(self, batch_dialogs_attention_mask):
         batch_dialogs_mask = []
@@ -205,9 +214,9 @@ class ourModel (nn.Module):
     def forward(self, batch_query_emb, batch_profile_emb, batch_dialogs_emb, \
          batch_query_mask, batch_profile_mask, batch_dialogs_mask):
 
-        batch_query_emb = batch_query_emb.masked_fill(batch_query_mask.unsqueeze(-1)==0, 0)
-        batch_profile_emb = batch_profile_emb.masked_fill(batch_profile_mask.unsqueeze(-1)==0, 0)
-        batch_dialogs_emb = batch_dialogs_emb.masked_fill(batch_dialogs_mask.unsqueeze(-1)==0, 0)
+        batch_query_emb = batch_query_emb.masked_fill(batch_query_mask.unsqueeze(-1)==0, 5e-5)
+        batch_profile_emb = batch_profile_emb.masked_fill(batch_profile_mask.unsqueeze(-1)==0, 5e-5)
+        batch_dialogs_emb = batch_dialogs_emb.masked_fill(batch_dialogs_mask.unsqueeze(-1)==0, 5e-5)
 
 
         batch_query_emb_norm = torch.nn.functional.normalize(batch_query_emb, dim=-1) 
@@ -215,13 +224,15 @@ class ourModel (nn.Module):
         batch_dialogs_emb_norm = torch.nn.functional.normalize(batch_dialogs_emb, dim=-1) 
 
         query_profile_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_profile_emb_norm.transpose(1,2))
-        query_profile_with_A_matrix = torch.bmm(torch.bmm(batch_query_emb_norm, self.A_query_profile), batch_profile_emb_norm.transpose(1,2))
-        M_query_profile = torch.stack([query_profile_with_A_matrix, query_profile_similarity_matrix], dim=1)
+        temp_query_profile_with_A_matrix = torch.nn.functional.normalize(self.A_query_profile(batch_query_emb_norm), dim=-1)
+        query_profile_with_A_matrix = torch.bmm(temp_query_profile_with_A_matrix, batch_profile_emb_norm.transpose(1,2))
+        M_query_profile = torch.stack([query_profile_with_A_matrix, query_profile_similarity_matrix], dim=1) # batch_size, 2, query_len, profile_len
 
         query_dialogs_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_dialogs_emb_norm.transpose(1,2))
-        query_dialogs_with_A_matrix = torch.bmm(torch.bmm(batch_query_emb_norm, self.A_query_dialogs), batch_dialogs_emb_norm.transpose(1,2))
+        temp_query_dialogs_with_A_matrix = torch.nn.functional.normalize(self.A_query_dialogs(batch_query_emb_norm), dim=-1)
+        query_dialogs_with_A_matrix = torch.bmm(temp_query_dialogs_with_A_matrix, batch_dialogs_emb_norm.transpose(1,2))
         M_query_dialogs = torch.stack([query_dialogs_with_A_matrix, query_dialogs_similarity_matrix], dim=1)
-        
+
         # 2.Interaction
         query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
         query_dialogs_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
@@ -235,14 +246,15 @@ class ourModel (nn.Module):
 
         # 2.2 Calcuate query-profile attn interaction
         query_profile_interaction_simialrity_matrix = torch.bmm(query_add_profile_attn, profile_add_query_attn.transpose(1,2))
-        query_profile_attn_with_A_matrix = torch.bmm(torch.bmm(query_add_profile_attn, self.A_query_profile_interaction), profile_add_query_attn.transpose(1,2))
+        temp_query_profile_attn_with_A_matrix = torch.nn.functional.normalize(self.A_query_profile_interaction(query_add_profile_attn), dim=-1)
+        query_profile_attn_with_A_matrix = torch.bmm(temp_query_profile_attn_with_A_matrix, profile_add_query_attn.transpose(1,2))
         M_query_profile_attn = torch.stack([query_profile_attn_with_A_matrix, query_profile_interaction_simialrity_matrix], dim=1)
         
         # 2.3 Calcuate query-dialogs attn interaction
         query_dialogs_interaction_simialrity_matrix = torch.bmm(query_add_dialogs_attn, dialogs_add_query_attn.transpose(1,2))
-        query_dialogs_attn_with_A_matrix = torch.bmm(torch.bmm(query_add_dialogs_attn, self.A_query_dialogs_interaction), dialogs_add_query_attn.transpose(1,2))
+        temp_query_dialogs_attn_with_A_matrix = torch.nn.functional.normalize(self.A_query_dialogs_interaction(query_add_dialogs_attn), dim=-1)
+        query_dialogs_attn_with_A_matrix = torch.bmm(temp_query_dialogs_attn_with_A_matrix, dialogs_add_query_attn.transpose(1,2))
         M_query_dialogs_attn = torch.stack([query_dialogs_attn_with_A_matrix, query_dialogs_interaction_simialrity_matrix], dim=1)
-        
         # print("M_query_profile_attn:", M_query_profile_attn.shape)
         # print("M_query_dialogs_attn:", M_query_dialogs_attn.shape)
         # print("M_query_profile:", M_query_profile.shape)
@@ -306,12 +318,9 @@ def valid_epoch(valid_dataloader, model, tag):
         batch_dialogs_mask = model.get_dialog_sent_masks(batch_dialogs_attention_mask).float()
  
         logits = model(batch_query_embed, batch_profile_embed, batch_dialogs_embed, batch_query_attention_mask, batch_profile_attention_mask, batch_dialogs_mask)
-        if logits.float().argmax(dim=0) == 0:
-            num_ok += 1
-        total_num += 1
+
         loss = loss_fun(logits, labels)
         epoch_loss.append(loss.item())
-    print("Validation Accuracy: ", num_ok/total_num)
     return epoch_loss
     
 def test_process(test_dataloader, model):
