@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP_add_interaction_selector import ourModel, train_epoch, valid_epoch, test_process
+from Modules.MLP_add_interaction_edit_transformer import ourModel, train_epoch, valid_epoch, test_process
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -32,7 +32,7 @@ parser.add_argument('--cleaned_path', default='./cleaned', type=str)
 
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
 parser.add_argument('--neg_sample', default=10, type=int)
-parser.add_argument('--batch_size', default=64, type=int)
+parser.add_argument('--batch_size', default=256, type=int)
 parser.add_argument('--lr', default=0.001, type=float)
 parser.add_argument('--patience', default=5, type=int)
 parser.add_argument('--output_dir', default="saved_model", type=str)
