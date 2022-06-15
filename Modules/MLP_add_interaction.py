@@ -170,8 +170,8 @@ class ourModel (nn.Module):
         query_dialogs_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_dialogs_emb_norm.transpose(1,2))
 
         # Interaction
-        query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
-        query_dialogs_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
+        query_profile_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
+        query_dialogs_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
 
         query_add_profile_attn = self.query_transformer(batch_query_emb_norm, batch_profile_emb_norm, batch_profile_emb_norm, mask=~query_profile_attn_mask_)
         profile_add_query_attn = self.profile_transformer(batch_profile_emb_norm, batch_query_emb_norm, batch_query_emb_norm, mask=~query_profile_attn_mask_.transpose(1,2))

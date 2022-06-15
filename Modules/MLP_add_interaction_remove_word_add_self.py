@@ -102,7 +102,7 @@ class cnnBlock(nn.Module):
         Z = self.relu(self.cnn_2d_query_profile_1(matrix))
         # print("cnn_query_profile Z1: ", Z)
         Z = self.maxpooling_query_profile_1(Z)
-        # print("cnn_query_profile Z2: ", Z)
+        print("cnn_query_profile Z2: ", Z)
         Z = Z.view(Z.size(0), -1)
 
         output_V = self.affine_query_profile(Z)
@@ -113,7 +113,7 @@ class cnnBlock(nn.Module):
         Z = self.relu(self.cnn_2d_query_dialogs_1(matrix))
         # print("cnn_query_dialogs Z1: ", Z)
         Z = self.maxpooling_query_dialogs_1(Z)
-        # print("cnn_query_dialogs Z2: ", Z)
+        print("cnn_query_dialogs Z2: ", Z)
         Z = Z.view(Z.size(0), -1)
         output_V = self.affine_query_dialogs(Z)
         return output_V
@@ -173,21 +173,21 @@ class ourModel (nn.Module):
         batch_profile_emb_norm = torch.nn.functional.normalize(batch_profile_emb, dim=-1) 
         batch_dialogs_emb_norm = torch.nn.functional.normalize(batch_dialogs_emb, dim=-1) 
 
-        query_self_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_query_mask.unsqueeze(1)).bool()
-        profile_self_attn_mask_ = ~torch.bmm(batch_profile_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
-        dialogs_self_attn_mask_ = ~torch.bmm(batch_dialogs_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
+        query_self_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_query_mask.unsqueeze(1)).bool()
+        profile_self_attn_mask_ = torch.bmm(batch_profile_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
+        dialogs_self_attn_mask_ = torch.bmm(batch_dialogs_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
 
-        batch_query_self_attn = self.query_self_transformer(batch_query_emb_norm, batch_query_emb_norm, batch_query_emb_norm, query_self_attn_mask_)
-        batch_profile_self_attn = self.profile_self_transformer(batch_profile_emb_norm, batch_profile_emb_norm, batch_profile_emb_norm, profile_self_attn_mask_)
-        batch_dialogs_self_attn = self.dialogs_self_transformer(batch_dialogs_emb_norm, batch_dialogs_emb_norm, batch_dialogs_emb_norm, dialogs_self_attn_mask_)
+        batch_query_self_attn = self.query_self_transformer(batch_query_emb_norm, batch_query_emb_norm, batch_query_emb_norm, mask=~query_self_attn_mask_)
+        batch_profile_self_attn = self.profile_self_transformer(batch_profile_emb_norm, batch_profile_emb_norm, batch_profile_emb_norm, mask=~profile_self_attn_mask_)
+        batch_dialogs_self_attn = self.dialogs_self_transformer(batch_dialogs_emb_norm, batch_dialogs_emb_norm, batch_dialogs_emb_norm, mask=~dialogs_self_attn_mask_)
 
         query_profile_similarity_matrix = torch.bmm(batch_query_self_attn, batch_profile_self_attn.transpose(1,2))
 
         query_dialogs_similarity_matrix = torch.bmm(batch_query_self_attn, batch_dialogs_self_attn.transpose(1,2))
 
         # 2.Interaction
-        query_profile_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
-        query_dialogs_attn_mask_ = ~torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
+        query_profile_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
+        query_dialogs_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
         
         # 2.1 Calcuate attn
         query_add_profile_attn = self.query_transformer(batch_query_emb_norm, batch_profile_emb_norm, batch_profile_emb_norm, mask=~query_profile_attn_mask_)
