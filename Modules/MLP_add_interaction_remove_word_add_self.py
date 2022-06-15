@@ -102,7 +102,6 @@ class cnnBlock(nn.Module):
         Z = self.relu(self.cnn_2d_query_profile_1(matrix))
         # print("cnn_query_profile Z1: ", Z)
         Z = self.maxpooling_query_profile_1(Z)
-        print("cnn_query_profile Z2: ", Z)
         Z = Z.view(Z.size(0), -1)
 
         output_V = self.affine_query_profile(Z)
@@ -113,7 +112,6 @@ class cnnBlock(nn.Module):
         Z = self.relu(self.cnn_2d_query_dialogs_1(matrix))
         # print("cnn_query_dialogs Z1: ", Z)
         Z = self.maxpooling_query_dialogs_1(Z)
-        print("cnn_query_dialogs Z2: ", Z)
         Z = Z.view(Z.size(0), -1)
         output_V = self.affine_query_dialogs(Z)
         return output_V
