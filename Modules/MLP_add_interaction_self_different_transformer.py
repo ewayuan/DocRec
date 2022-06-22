@@ -58,7 +58,7 @@ class TransformerBlock(nn.Module):
 class cnnBlock(nn.Module):
     def __init__(self):
         super(cnnBlock, self).__init__()
-        self.cnn_2d_query_profile_1 = nn.Conv2d(in_channels=2, out_channels=4, kernel_size=(3,3))
+        self.cnn_2d_query_profile_1 = nn.Conv2d(in_channels=3, out_channels=4, kernel_size=(3,3))
         self.cnn_2d_query_profile_2 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(3,3))
         self.cnn_2d_query_profile_3 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(3,3))
         self.maxpooling_query_profile_1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
@@ -67,14 +67,11 @@ class cnnBlock(nn.Module):
         self.leaky_relu = nn.LeakyReLU()
         self.tanh = nn.Tanh()
 
-        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=2, out_channels=4, kernel_size=(3,3))
+        self.cnn_2d_query_dialogs_1 = nn.Conv2d(in_channels=3, out_channels=4, kernel_size=(3,3))
         self.cnn_2d_query_dialogs_2 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(3,3))
         self.cnn_2d_query_dialogs_3 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(3,3))
         self.maxpooling_query_dialogs_1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         self.affine_query_dialogs = nn.Linear(in_features=2240, out_features=1000)
-        self.bn_qd_1 = nn.BatchNorm2d(num_features=4)
-        self.bn_qd_2 = nn.BatchNorm2d(num_features=8)
-        self.bn_qd_2 = nn.BatchNorm2d(num_features=16)
         
         self.bn1 = nn.BatchNorm1d(num_features=768)
         self.fc1 = nn.Linear(in_features =1000 * 2, out_features = 768)
@@ -139,10 +136,11 @@ class cnnBlock(nn.Module):
         return output_V
 
     def forward(self, query_profile_similarity_matrix, query_dialogs_similarity_matrix, \
+                query_profile_self_attn_similarity_matrix, query_dialogs_self_attn_similarity_matrix,\
                 query_profile_interaction_simialrity_matrix, query_dialogs_interaction_simialrity_matrix):
 
-        query_profie_M = torch.stack([query_profile_similarity_matrix, query_profile_interaction_simialrity_matrix], dim=1)
-        query_dialogs_M = torch.stack([query_dialogs_similarity_matrix, query_dialogs_interaction_simialrity_matrix], dim=1)
+        query_profie_M = torch.stack([query_profile_similarity_matrix, query_profile_self_attn_similarity_matrix, query_profile_interaction_simialrity_matrix], dim=1)
+        query_dialogs_M = torch.stack([query_dialogs_similarity_matrix, query_dialogs_self_attn_similarity_matrix, query_dialogs_interaction_simialrity_matrix], dim=1)
 
         # print("query_profie_M: ", query_profie_M)
         # print("query_dialogs_M: ", query_dialogs_M)
@@ -172,6 +170,10 @@ class ourModel (nn.Module):
         self.profile_transformer = TransformerBlock(input_size=self.embed_dim)
         self.dialogs_transformer = TransformerBlock(input_size=self.embed_dim)
 
+        self.query_self_transformer  = TransformerBlock(input_size=self.embed_dim)
+        self.profile_self_transformer = TransformerBlock(input_size=self.embed_dim)
+        self.dialogs_self_transformer = TransformerBlock(input_size=self.embed_dim)
+
     def get_dialog_sent_masks(self, batch_dialogs_attention_mask):
         batch_dialogs_mask = []
         for i in range(batch_dialogs_attention_mask.shape[0]):
@@ -194,6 +196,27 @@ class ourModel (nn.Module):
         # Bert Word Level Embedding Similarity Matrix 
         query_profile_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_profile_emb_norm.transpose(1,2))
         query_dialogs_similarity_matrix = torch.bmm(batch_query_emb_norm, batch_dialogs_emb_norm.transpose(1,2))
+
+        # Self-Attention
+        query_self_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_query_mask.unsqueeze(1)).bool()
+        profile_self_attn_mask_ = torch.bmm(batch_profile_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
+        dialogs_self_attn_mask_ = torch.bmm(batch_dialogs_mask.unsqueeze(-1), batch_dialogs_mask.unsqueeze(1)).bool()
+
+        batch_query_self_attn = self.query_self_transformer(batch_query_emb, batch_query_emb, batch_query_emb, mask=query_self_attn_mask_)
+        batch_query_self_attn = batch_query_self_attn.masked_fill(batch_query_mask.unsqueeze(-1)==0, 0)
+        batch_query_self_attn_norm = torch.nn.functional.normalize(batch_query_self_attn, dim=-1) 
+
+        batch_profile_self_attn = self.profile_self_transformer(batch_profile_emb, batch_profile_emb, batch_profile_emb, mask=profile_self_attn_mask_)
+        batch_profile_self_attn = batch_profile_self_attn.masked_fill(batch_profile_mask.unsqueeze(-1)==0, 0)
+        batch_profile_self_attn_norm = torch.nn.functional.normalize(batch_profile_self_attn, dim=-1) 
+        
+        batch_dialogs_self_attn = self.dialogs_self_transformer(batch_dialogs_emb, batch_dialogs_emb, batch_dialogs_emb, mask=dialogs_self_attn_mask_)
+        batch_dialogs_self_attn = batch_dialogs_self_attn.masked_fill(batch_dialogs_mask.unsqueeze(-1)==0, 0)
+        batch_dialogs_self_attn_norm = torch.nn.functional.normalize(batch_dialogs_self_attn, dim=-1) 
+
+        query_profile_self_attn_similarity_matrix = torch.bmm(batch_query_self_attn_norm, batch_profile_self_attn_norm.transpose(1,2))
+        query_dialogs_self_attn_similarity_matrix = torch.bmm(batch_query_self_attn_norm, batch_dialogs_self_attn_norm.transpose(1,2))
+
 
         # Interaction
         query_profile_attn_mask_ = torch.bmm(batch_query_mask.unsqueeze(-1), batch_profile_mask.unsqueeze(1)).bool()
@@ -218,23 +241,8 @@ class ourModel (nn.Module):
         query_profile_interaction_simialrity_matrix = torch.bmm(query_add_profile_attn_norm, profile_add_query_attn_norm.transpose(1,2))
         query_dialogs_interaction_simialrity_matrix = torch.bmm(query_add_dialogs_attn_norm, dialogs_add_query_attn_norm.transpose(1,2))
         
-        # print("query_add_profile_attn: ", query_add_profile_attn.shape)
-        # print("profile_add_query_attn: ", profile_add_query_attn.shape)
-        # print("query_add_dialogs_attn: ", query_add_dialogs_attn.shape)
-        # print("dialogs_add_query_attn: ", dialogs_add_query_attn.shape)
-        # print("batch_query_emb: ", batch_query_emb)
-        # print("batch_profile_emb: ", batch_profile_emb)
-        # print("batch_dialogs_emb: ", batch_dialogs_emb)
-        # print("batch_query_emb_norm: ", batch_query_emb_norm)
-        # print("batch_profile_emb_norm: ", batch_profile_emb_norm)
-        # print("batch_dialogs_emb_norm: ", batch_dialogs_emb_norm)
-
-        # print("query_profile_similarity_matrix: ", query_profile_similarity_matrix)
-        # print("query_dialogs_similarity_matrix: ", query_dialogs_similarity_matrix)
-        # print("query_profile_interaction_simialrity_matrix: ", query_profile_interaction_simialrity_matrix)
-        # print("query_dialogs_interaction_simialrity_matrix: ", query_dialogs_interaction_simialrity_matrix)
-
         output = self.cnn_block(query_profile_similarity_matrix, query_dialogs_similarity_matrix, \
+                                query_profile_self_attn_similarity_matrix, query_dialogs_self_attn_similarity_matrix,\
                                 query_profile_interaction_simialrity_matrix, query_dialogs_interaction_simialrity_matrix)
 
         return output.squeeze()
