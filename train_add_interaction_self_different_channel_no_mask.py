@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm, trange
 import time
-from Modules.MLP_add_interaction_self_different_channel import ourModel, train_epoch, valid_epoch, test_process
+from Modules.MLP_add_interaction_self_different_channel_no_mask import ourModel, train_epoch, valid_epoch, test_process
 from utils.dataset import DoctorRecDataset
 from utils.EarlyStopping import EarlyStopping
 from utils.loss import weighted_class_bceloss
@@ -28,7 +28,7 @@ parser.add_argument('--gpu', default=0, type=int)
 parser.add_argument('--n_gpu', default=1, type=int)
 
 parser.add_argument('--name', default="med-bert", type=str)
-parser.add_argument('--cleaned_path', default='./cleaned', type=str)
+parser.add_argument('--cleaned_path', default='./cleaned_mc_bert_base', type=str)
 
 parser.add_argument('--dr_dialog_sample', default=100, type=int)
 parser.add_argument('--neg_sample', default=10, type=int)
@@ -97,7 +97,7 @@ def main():
     print("The length of dialogues: ", len(dialogue))
 
     print('Building training dataset and dataloader...')
-    train_set = pd.read_csv(f'./dataset/train_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
+    train_set = pd.read_csv(f'./dataset/combined_train_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
     train_dataset = DoctorRecDataset(
         'train', train_set, profile, query, dialogue,
         dr_dialog_sample=args.dr_dialog_sample, neg_sample=args.neg_sample
@@ -106,7 +106,7 @@ def main():
     print('Done')
 
     print('Building validation dataset and dataloader...')
-    valid_set = pd.read_csv(f'./dataset/valid_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
+    valid_set = pd.read_csv(f'./dataset/combined_valid_cleaned.csv', delimiter='\t', encoding='utf-8', dtype={'dr_id': str})
     val_dataset = DoctorRecDataset(
         'valid', valid_set, profile, query, dialogue,
         dr_dialog_sample=args.dr_dialog_sample, neg_sample=args.neg_sample
